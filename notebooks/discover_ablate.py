@@ -47,10 +47,10 @@ class Config:
     middle_layers: Tuple[int, ...] = tuple(range(12, 24))
     seed: int = 42
 
-    # Calibration / validation / test sizes
-    calib_size: int = 400
-    val_size: int = 200
-    test_size: int = 300
+    # EMS calibration / held-out / test sizes
+    calib_size: int = 1000
+    val_size: int = 500
+    test_size: int = 500
 
     # Discovery
     stage1_topk: int = 64
@@ -60,11 +60,11 @@ class Config:
     z_threshold: float = 4.0
     max_anchors: int = 64
 
-    # Ablation
+    # K-sweep
     k_values: Tuple[int, ...] = (1, 2, 4, 8, 16, 32, 64)
     n_random_trials: int = 30
-    ablation_eval_pairs: int = 200
-    ablation_test_size: int = 300
+    ablation_eval_pairs: int = 500
+    ablation_test_size: int = 500
 
     # Output
     discovery_file: str = "anchors_afm_openmed_4_5b.json"

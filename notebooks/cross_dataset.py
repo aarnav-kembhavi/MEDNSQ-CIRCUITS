@@ -52,10 +52,10 @@ class Config:
     model_id: str = "meta-llama/Meta-Llama-3-8B"
     anchor_file: str = "anchors_final.json"  # Or AFM-specific anchors if available
     
-    # Dataset sizes (160 is optimal: enough power, not too costly)
-    n_medqa: int = 400
-    n_medmcqa: int = 400
-    n_pubmedqa: int = 400
+    # EMS held-out validation: 500 samples per dataset
+    n_medqa: int = 500
+    n_medmcqa: int = 500
+    n_pubmedqa: int = 500
     
     # Anchor selection
     k_top: int = len(AFM_ANCHORS)  # Number of top anchors to evaluate
@@ -63,9 +63,9 @@ class Config:
     # Clustering
     k_clusters: int = 4  # Number of clusters (based on elbow method)
     
-    # Random baseline
-    n_random_trials: int = 1  # Only 1 seed, no ablation sampling
-    random_seed: int = 42
+    # Anchor-vs-random: 100 trials x 64 columns, 5 seeds
+    n_random_trials: int = 100
+    random_seeds: Tuple[int, ...] = (42, 123, 7, 13, 97)
     
     # Data caching (AFM base model)
     medqa_cache: str = "base_afm_medqa_pairs.txt"
@@ -84,6 +84,7 @@ class Config:
         assert self.k_top > 0, "k_top must be positive"
         assert self.k_clusters >= 2, "k_clusters must be at least 2"
         assert self.n_random_trials >= 1, "Need at least 1 trial for baseline"
+        assert len(self.random_seeds) == 5, "Need exactly 5 random seeds"
         
     @property
     def config_dict(self) -> Dict:
@@ -568,11 +569,11 @@ def main():
     """Main execution with full reproducibility."""
     
     # Set all seeds
-    random.seed(CONFIG.random_seed)
-    np.random.seed(CONFIG.random_seed)
-    torch.manual_seed(CONFIG.random_seed)
+    random.seed(CONFIG.random_seeds[0])
+    np.random.seed(CONFIG.random_seeds[0])
+    torch.manual_seed(CONFIG.random_seeds[0])
     if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(CONFIG.random_seed)
+        torch.cuda.manual_seed_all(CONFIG.random_seeds[0])
     
     print("=" * 60)
     print("ALL-IN-ONE ANCHOR EVALUATION (AFM VERSION)")
@@ -580,7 +581,8 @@ def main():
     print(f"Config hash: {CONFIG.config_hash}")
     print(f"Model: {CONFIG.model_id}")
     print(f"Top anchors: {CONFIG.k_top}")
-    print(f"Random trials: {CONFIG.n_random_trials}")
+    print(f"Random trials per seed: {CONFIG.n_random_trials}")
+    print(f"Random seeds: {list(CONFIG.random_seeds)}")
     print("=" * 60)
     
     # ------------------------------------------------------------------------
@@ -647,9 +649,12 @@ def main():
         if (l, c) not in anchor_set
     ]
     
-    # Generate random trials from non-anchor pool (single seed, no sampling loop).
-    random_trial_rng = random.Random(CONFIG.random_seed)
-    random_trials = [random_trial_rng.sample(candidate_neurons, len(anchor_neurons))]
+    # Generate random trials from non-anchor pool: 100 trials x 64 columns, 5 seeds.
+    random_trials: List[List[Tuple[int, int]]] = []
+    for seed in CONFIG.random_seeds:
+        random_trial_rng = random.Random(seed)
+        for _ in range(CONFIG.n_random_trials):
+            random_trials.append(random_trial_rng.sample(candidate_neurons, len(anchor_neurons)))
     
     # Compute drops (crush ablation only)
     anchor_vs_random = {}
@@ -662,11 +667,11 @@ def main():
             probe, pairs, anchor_neurons, baseline=baseline[name]
         )
         
-        # Random drops (single trial)
+        # Random drops across all configured seed/trial combinations
         random_drops_list = []
         for i, trial in enumerate(random_trials):
             if (i + 1) % 10 == 0:
-                print(f"    Random trial {i+1}/{CONFIG.n_random_trials}")
+                print(f"    Random trial {i+1}/{len(random_trials)}")
             mean_drop, _, _ = mean_drop_for_set(
                 probe,
                 pairs,
@@ -677,7 +682,7 @@ def main():
         
         # Statistical comparison
         stats_result = compare_anchor_vs_random(
-            [anchor_mean] * CONFIG.n_random_trials,  # Broadcast for t-test
+            [anchor_mean] * len(random_trials),  # Broadcast for t-test
             random_drops_list,
             name
         )
@@ -692,7 +697,9 @@ def main():
             "t_statistic": stats_result["t_statistic"],
             "p_value": stats_result["p_value"],
             "cohens_d": stats_result["cohens_d"],
-            "n_random_trials": CONFIG.n_random_trials
+            "n_random_trials_per_seed": CONFIG.n_random_trials,
+            "n_random_seeds": len(CONFIG.random_seeds),
+            "n_random_trials_total": len(random_trials)
         }
         
         sig = "***" if stats_result["p_value"] < 0.001 else "**" if stats_result["p_value"] < 0.01 else "*" if stats_result["p_value"] < 0.05 else "ns"
@@ -740,7 +747,7 @@ def main():
     assignments, centers, cluster_metrics = perform_kmeans(
         z, 
         k=CONFIG.k_clusters,
-        seed=CONFIG.random_seed
+        seed=CONFIG.random_seeds[0]
     )
     
     # Summarize clusters
@@ -786,7 +793,7 @@ def main():
             "config": CONFIG.config_dict,
             "config_hash": CONFIG.config_hash,
             "timestamp": datetime.now().isoformat(),
-            "random_seed": CONFIG.random_seed,
+            "random_seeds": list(CONFIG.random_seeds),
             "torch_version": torch.__version__,
             "ablation_method": ABLATION_METHOD,
         },
