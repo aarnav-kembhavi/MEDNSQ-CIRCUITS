@@ -1,7 +1,6 @@
 # Mechanistic Sabotage Analysis Toolkit
 
-Official implementation of **Mechanistic Sabotage Analysis** and **Empirical Margin Sensitivity (EMS)** as described in the NeurIPS 2026 paper: 
-*"From Behavioral Memorization to Mechanistic Sabotage: Neuron-Level Causal Analysis of SFT and RL in Medical LLMs"*.
+Official implementation of the Mechanistic Sabotage Analysis and Empirical Margin Sensitivity (EMS) framework.
 
 ## Overview
 
@@ -28,8 +27,8 @@ This repository provides a high-precision toolkit for identifying and validating
 ## Installation
 
 ```bash
-git clone https://github.com/aarnav-kembhavi/MEDNSQ-CIRCUITS.git
-cd MEDNSQ-CIRCUITS
+git clone [ANONYMOUS_REPO_URL]
+cd [REPO_NAME]
 pip install -r requirements.txt
 ```
 
@@ -39,25 +38,18 @@ pip install -r requirements.txt
 Identify the most causally significant neurons for a specific model:
 
 ```bash
-python scripts/run_ems_pipeline.py --model_id google/medgemma-4b-it --n_calib 1000 --output_dir results/model_a
+python scripts/run_ems_pipeline.py --model_id [MODEL_ID] --n_calib 1000 --output_dir results/model_a
 ```
 
 ### 2. Cross-Dataset Evaluation
 Analyze how discovered anchors perform across different medical benchmarks:
 
 ```bash
-python scripts/run_cross_dataset_eval.py --model_id google/medgemma-4b-it --anchor_file results/model_a/discovered_anchors.json
+python scripts/run_cross_dataset_eval.py --model_id [MODEL_ID] --anchor_file results/model_a/discovered_anchors.json
 ```
 
 ## Citation
 
-If you find this work useful in your research, please cite:
-
-```bibtex
-@article{kembhavi2026mechanistic,
-  title={From Behavioral Memorization to Mechanistic Sabotage: Neuron-Level Causal Analysis of SFT and RL in Medical LLMs},
-  author={Kembhavi, Aarnav and [Other Authors]},
-  journal={NeurIPS},
-  year={2026}
-}
+```text
+Under Review (NeurIPS 2026)
 ```
